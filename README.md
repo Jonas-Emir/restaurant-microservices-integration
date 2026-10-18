@@ -4,10 +4,10 @@ Integracao assincrona orientada a eventos entre microsservicos utilizando .NET 8
 
 ```mermaid
 flowchart LR
-    A["RestauranteService\n(Produtor)"] -->|Persiste dados| DB1[("SQL Server")]
-    A -->|Publica evento| B{{"RabbitMQ\nExchange: trigger"}}
-    B -->|Broadcast| C["ItemService\n(Consumidor)"]
-    C -->|Replica local| DB2[("Banco em Memoria")]
+    A["RestauranteService<br/>(Produtor)"] -->|"Persiste dados"| DB1[("SQL Server")]
+    A -->|"Publica evento"| B["RabbitMQ<br/>Exchange: trigger"]
+    B -->|"Broadcast"| C["ItemService<br/>(Consumidor)"]
+    C -->|"Replica local"| DB2[("Banco em Memoria")]
 ```
 
 ### Resumo Tecnico
@@ -71,25 +71,25 @@ O fluxo de comunicação e separação entre contextos segue a estrutura abaixo:
 
 ```mermaid
 flowchart TD
-    Client["Cliente (HTTP / Swagger)"] -->|POST /api/Restaurante| RS["RestauranteService"]
+    Client["Cliente<br/>(HTTP / Swagger)"] -->|"POST /api/Restaurante"| RS["RestauranteService"]
 
-    subgraph Contexto: Restaurante
-        RS -->|Grava dados| SQL[("SQL Server (restaurantedb)")]
-        RS -->|Publica evento JSON| RMQ_PUB["RabbitMqClient"]
+    subgraph S1 ["Contexto: Restaurante"]
+        RS -->|"Grava dados"| SQL[("SQL Server<br/>(restaurantedb)")]
+        RS -->|"Publica evento JSON"| RMQ_PUB["RabbitMqClient"]
     end
 
-    subgraph RabbitMQ Broker
-        RMQ_PUB -->|BasicPublish| EX["Exchange: trigger (Fanout)"]
-        EX -->|Distribui| Q1["Fila ItemService"]
+    subgraph S2 ["RabbitMQ Broker"]
+        RMQ_PUB -->|"BasicPublish"| EX["Exchange: trigger<br/>(Fanout)"]
+        EX -->|"Distribui"| Q1["Fila ItemService"]
     end
 
-    subgraph Contexto: Itens e Cardápio
-        Q1 -->|Consome mensagem| SUB["RabbitMqSubscriber (BackgroundService)"]
-        SUB -->|Repassa payload| PROC["ProcessaEvento"]
-        PROC -->|Persiste réplica| MEM[("EF Core In-Memory")]
-        Client -->|GET /api/item/restaurante| IS["ItemService"]
-        IS -->|Consulta réplica local| MEM
-        Client -->|POST /api/item/restaurante/{id}/item| IS
+    subgraph S3 ["Contexto: Itens e Cardapio"]
+        Q1 -->|"Consome mensagem"| SUB["RabbitMqSubscriber<br/>(BackgroundService)"]
+        SUB -->|"Repassa payload"| PROC["ProcessaEvento"]
+        PROC -->|"Persiste replica"| MEM[("EF Core<br/>In-Memory")]
+        Client -->|"GET /api/item/restaurante"| IS["ItemService"]
+        IS -->|"Consulta replica local"| MEM
+        Client -->|"POST /api/item/restaurante/:id/item"| IS
     end
 ```
 
