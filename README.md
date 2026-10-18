@@ -16,9 +16,9 @@ flowchart LR
 | :--- | :--- | :--- |
 | RestauranteService | .NET 8 Web API / EF Core 8 | Servico produtor e dono dos dados cadastrais |
 | ItemService | .NET 8 Web API / EF Core In-Memory | Servico consumidor e gestor de itens/cardapio |
-| RabbitMQ | Exchange Fanout (`trigger`) | Broker AMQP para desacoplamento temporal e estrutural |
-| SQL Server 2019 | Base `restaurantedb` | Persistencia relacional com migrations automaticas |
-| Docker Compose | Rede interna bridge (`restaurante-network`) | Orquestracao unificada de todos os servicos |
+| RabbitMQ | Exchange Fanout (trigger) | Broker AMQP para desacoplamento temporal e estrutural |
+| SQL Server 2019 | Base restaurantedb | Persistencia relacional com migrations automaticas |
+| Docker Compose | Rede interna bridge (restaurante-network) | Orquestracao unificada de todos os servicos |
 
 ### Acesso Rapido aos Servicos
 
@@ -59,7 +59,7 @@ flowchart LR
 
 Este projeto aborda um problema clássico de arquitetura distribuída: como manter dados sincronizados entre serviços diferentes sem criar dependência direta via HTTP.
 
-Em vez de fazer o `ItemService` consultar o `RestauranteService` a cada requisição para saber se um restaurante existe, o sistema utiliza mensageria assíncrona. Quando um novo restaurante é cadastrado no `RestauranteService`, um evento é publicado no RabbitMQ. O `ItemService` consome essa mensagem e armazena uma cópia local do restaurante em sua própria base, ficando autônomo para responder suas requisições.
+Em vez de fazer o ItemService consultar o RestauranteService a cada requisição para saber se um restaurante existe, o sistema utiliza mensageria assíncrona. Quando um novo restaurante é cadastrado no RestauranteService, um evento é publicado no RabbitMQ. O ItemService consome essa mensagem e armazena uma cópia local do restaurante em sua própria base, ficando autônomo para responder suas requisições.
 
 ---
 
@@ -97,10 +97,10 @@ flowchart TD
 
 ### 2.2. Funcionamento do RabbitMQ
 
-- **Exchange Fanout (`trigger`):** o publicador envia mensagens para uma exchange do tipo Fanout chamada `trigger`. Esse tipo de exchange transmite a mensagem para todas as filas conectadas a ela, sem avaliar chaves de roteamento (`routingKey`). Isso facilita plugar novos serviços consumidores no futuro sem mexer no publicador.
-- **Declaração dinâmica da fila:** no `ItemService`, a classe `RabbitMqSubscriber` declara uma fila anônima e exclusiva ao iniciar e a conecta à exchange `trigger`.
-- **Serialização:** os eventos trafegam como JSON serializado via `System.Text.Json` em `UTF-8`. O payload contém os campos básicos do restaurante: `Id`, `Nome`, `Endereco` e `Site`.
-- **Processamento em segundo plano:** o consumo de mensagens no `ItemService` roda dentro de um `BackgroundService` (`IHostedService`), processando os eventos de forma não-bloqueante em relação à API HTTP.
+- Exchange Fanout (trigger): o publicador envia mensagens para uma exchange do tipo Fanout chamada trigger. Esse tipo de exchange transmite a mensagem para todas as filas conectadas a ela, sem avaliar chaves de roteamento (routingKey). Isso facilita plugar novos serviços consumidores no futuro sem mexer no publicador.
+- Declaração dinâmica da fila: no ItemService, a classe RabbitMqSubscriber declara uma fila anônima e exclusiva ao iniciar e a conecta à exchange trigger.
+- Serialização: os eventos trafegam como JSON serializado via System.Text.Json em UTF-8. O payload contém os campos básicos do restaurante: Id, Nome, Endereco e Site.
+- Processamento em segundo plano: o consumo de mensagens no ItemService roda dentro de um BackgroundService (IHostedService), processando os eventos de forma não-bloqueante em relação à API HTTP.
 
 ---
 
@@ -108,8 +108,8 @@ flowchart TD
 
 Em sistemas orientados a eventos, uma mensagem pode ser entregue mais de uma vez devido a reconexões ou falhas transitórias. Para evitar duplicidades:
 
-1. O `ItemService` mapeia o `Id` recebido do `RestauranteService` para a propriedade `IdExterno` do seu modelo local.
-2. Antes de gravar o registro, a classe `ProcessaEvento` consulta o repositório local:
+1. O ItemService mapeia o Id recebido do RestauranteService para a propriedade IdExterno do seu modelo local.
+2. Antes de gravar o registro, a classe ProcessaEvento consulta o repositório local:
 
 ```csharp
 if (!itemRepository.ExisteRestauranteExterno(restaurante.Id))
@@ -127,23 +127,23 @@ Se o identificador já existir na base local, a mensagem é descartada sem dupli
 
 ### RestauranteService
 - Responsabilidade: cadastro e manutenção dos dados de restaurantes (dono do dado).
-- Banco de dados: SQL Server (`restaurantedb`). As migrações do Entity Framework Core são aplicadas automaticamente na inicialização da aplicação (`db.Database.Migrate()`).
+- Banco de dados: SQL Server (restaurantedb). As migrações do Entity Framework Core são aplicadas automaticamente na inicialização da aplicação (db.Database.Migrate()).
 - Endpoints principais:
-  - `GET /api/Restaurante`: lista todos os restaurantes.
-  - `GET /api/Restaurante/{id}`: consulta um restaurante por ID.
-  - `POST /api/Restaurante`: insere o restaurante no SQL Server e publica o evento no RabbitMQ.
+  - GET /api/Restaurante: lista todos os restaurantes.
+  - GET /api/Restaurante/{id}: consulta um restaurante por ID.
+  - POST /api/Restaurante: insere o restaurante no SQL Server e publica o evento no RabbitMQ.
 
 ### ItemService
 - Responsabilidade: gerenciamento de cardápio e itens associados a restaurantes.
-- Banco de dados: EF Core In-Memory Database. Funciona como réplica local de leitura, garantindo que o serviço consiga validar a existência de um restaurante sem fazer chamadas síncronas de rede ao `RestauranteService`.
+- Banco de dados: EF Core In-Memory Database. Funciona como réplica local de leitura, garantindo que o serviço consiga validar a existência de um restaurante sem fazer chamadas síncronas de rede ao RestauranteService.
 - Endpoints principais:
-  - `GET /api/item/restaurante`: lista os restaurantes replicados localmente.
-  - `GET /api/item/restaurante/{restauranteId}/item`: lista itens do cardápio de determinado restaurante.
-  - `GET /api/item/restaurante/{restauranteId}/item/{itemId}`: busca um item específico.
-  - `POST /api/item/restaurante/{restauranteId}/item`: adiciona um item ao restaurante (valida antes se o restaurante existe na réplica local).
+  - GET /api/item/restaurante: lista os restaurantes replicados localmente.
+  - GET /api/item/restaurante/{restauranteId}/item: lista itens do cardápio de determinado restaurante.
+  - GET /api/item/restaurante/{restauranteId}/item/{itemId}: busca um item específico.
+  - POST /api/item/restaurante/{restauranteId}/item: adiciona um item ao restaurante (valida antes se o restaurante existe na réplica local).
 
 ### RabbitMQ
-- Responsabilidade: intermediar a troca assíncrona de mensagens, isolando o ciclo de vida dos microsserviços. O `RestauranteService` não depende de o `ItemService` estar ativo ou respondendo no mesmo instante da chamada.
+- Responsabilidade: intermediar a troca assíncrona de mensagens, isolando o ciclo de vida dos microsserviços. O RestauranteService não depende de o ItemService estar ativo ou respondendo no mesmo instante da chamada.
 
 ---
 
@@ -224,12 +224,12 @@ Resposta esperada (HTTP 201):
 
 ### Passo 2: Acompanhar tráfego no RabbitMQ
 
-Acesse o painel do RabbitMQ em [http://localhost:15672](http://localhost:15672) (usuário `guest`, senha `guest`).
-Na aba **Exchanges**, abra a exchange `trigger`. Verifique que ela possui uma fila associada e que houve tráfego de mensagem no gráfico de mensagens entregues.
+Acesse o painel do RabbitMQ em http://localhost:15672 (usuário guest, senha guest).
+Na aba Exchanges, abra a exchange trigger. Verifique que ela possui uma fila associada e que houve tráfego de mensagem no gráfico de mensagens entregues.
 
 ### Passo 3: Inspecionar logs do ItemService
 
-Visualize os logs do container do `ItemService` para confirmar que a mensagem foi recebida:
+Visualize os logs do container do ItemService para confirmar que a mensagem foi recebida:
 
 ```bash
 docker compose logs -f itemservice
@@ -237,7 +237,7 @@ docker compose logs -f itemservice
 
 ### Passo 4: Validar os dados replicados no ItemService
 
-Consulte o endpoint de restaurantes do `ItemService`:
+Consulte o endpoint de restaurantes do ItemService:
 
 ```bash
 curl -X 'GET' 'http://localhost:8080/api/item/restaurante'
@@ -253,7 +253,7 @@ Resposta esperada:
 ]
 ```
 
-O restaurante cadastrado no `RestauranteService` foi replicado no `ItemService` sem que nenhuma chamada HTTP direta ocorresse entre os dois serviços.
+O restaurante cadastrado no RestauranteService foi replicado no ItemService sem que nenhuma chamada HTTP direta ocorresse entre os dois serviços.
 
 ### Passo 5: Cadastrar um item no cardápio
 
@@ -279,26 +279,28 @@ curl -X 'GET' 'http://localhost:8080/api/item/restaurante/1/item'
 
 ## 7. Variáveis de Ambiente
 
-As aplicações utilizam as seguintes configurações (definidas no `appsettings.json` ou sobrescritas via container):
+As aplicações utilizam as seguintes configurações (definidas no appsettings.json ou sobrescritas via container):
 
 ### RestauranteService
 
 | Variável | Descrição | Padrão no Compose |
 | :--- | :--- | :--- |
-| `ASPNETCORE_ENVIRONMENT` | Ambiente de execução | `Production` |
-| `ASPNETCORE_URLS` | Porta de escuta da API no container | `http://+:80` |
-| `ConnectionStrings__RestauranteConnection` | String de conexão do SQL Server | `Server=sql1;Database=restaurantedb;User Id=sa;Password=Teste123!;TrustServerCertificate=True;` |
-| `RabbitMQHost` | Endereço do broker RabbitMQ | `rabbitmq-service` |
-| `RabbitMQPort` | Porta do broker RabbitMQ | `5672` |
+| ASPNETCORE_ENVIRONMENT | Ambiente de execução | Production |
+| ASPNETCORE_HTTP_PORTS | Porta HTTP do container | 80 |
+| ASPNETCORE_URLS | URL de escuta interna | http://+:80 |
+| ConnectionStrings__RestauranteConnection | String de conexão do SQL Server | Server=sql1;Database=restaurantedb;User Id=sa;Password=Teste123!;TrustServerCertificate=True; |
+| RabbitMQHost | Endereço do broker RabbitMQ | rabbitmq-service |
+| RabbitMQPort | Porta do broker RabbitMQ | 5672 |
 
 ### ItemService
 
 | Variável | Descrição | Padrão no Compose |
 | :--- | :--- | :--- |
-| `ASPNETCORE_ENVIRONMENT` | Ambiente de execução | `Production` |
-| `ASPNETCORE_URLS` | Porta de escuta da API no container | `http://+:80` |
-| `RabbitMQHost` | Endereço do broker RabbitMQ | `rabbitmq-service` |
-| `RabbitMQPort` | Porta do broker RabbitMQ | `5672` |
+| ASPNETCORE_ENVIRONMENT | Ambiente de execução | Production |
+| ASPNETCORE_HTTP_PORTS | Porta HTTP do container | 80 |
+| ASPNETCORE_URLS | URL de escuta interna | http://+:80 |
+| RabbitMQHost | Endereço do broker RabbitMQ | rabbitmq-service |
+| RabbitMQPort | Porta do broker RabbitMQ | 5672 |
 
 ---
 
@@ -337,8 +339,8 @@ Para rodar os serviços em modo de debug na sua IDE (Visual Studio, VS Code ou R
    docker compose up -d sql1 rabbitmq-service
    ```
 
-2. Ajuste o arquivo `appsettings.Development.json` dos projetos para apontar para `localhost`:
-   - No `RestauranteService`:
+2. Ajuste o arquivo appsettings.Development.json dos projetos para apontar para localhost:
+   - No RestauranteService:
      ```json
      {
        "ConnectionStrings": {
@@ -348,7 +350,7 @@ Para rodar os serviços em modo de debug na sua IDE (Visual Studio, VS Code ou R
        "RabbitMQPort": "5672"
      }
      ```
-   - No `ItemService`:
+   - No ItemService:
      ```json
      {
        "RabbitMQHost": "localhost",
@@ -369,8 +371,8 @@ Para rodar os serviços em modo de debug na sua IDE (Visual Studio, VS Code ou R
 
 ### Possíveis Problemas
 
-- **Demora na inicialização do SQL Server:** em computadores mais lentos, o container do SQL Server pode demorar alguns segundos a mais para aceitar conexões. A política `restart: on-failure` no Docker Compose garante que o `RestauranteService` tente reconectar até o banco ficar pronto.
-- **Portas ocupadas:** se as portas 8080, 8081, 1433 ou 5672 já estiverem em uso no seu sistema operacional, altere a porta mapeada à esquerda no `docker-compose.yml` (por exemplo, `"8082:80"`).
+- Demora na inicialização do SQL Server: em computadores mais lentos, o container do SQL Server pode demorar alguns segundos a mais para aceitar conexões. A política restart: on-failure no Docker Compose garante que o RestauranteService tente reconectar até o banco ficar pronto.
+- Portas ocupadas: se as portas 8080, 8081, 1433 ou 5672 já estiverem em uso no seu sistema operacional, altere a porta mapeada à esquerda no docker-compose.yml (por exemplo, "8082:80").
 
 ---
 
