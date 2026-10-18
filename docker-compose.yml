@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  sql1:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: sql1
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=Teste123!
+    ports:
+      - "1433:1433"
+    networks:
+      - restaurante-network
+    restart: unless-stopped
+
+  rabbitmq-service:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-service
+    hostname: rabbitmq-service
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - restaurante-network
+    restart: unless-stopped
+
+  restauranteservice:
+    build:
+      context: ./RestauranteService
+      dockerfile: Dockerfile
+    container_name: restauranteservice
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_HTTP_PORTS=80
+      - ASPNETCORE_URLS=http://+:80
+      - ConnectionStrings__RestauranteConnection=Server=sql1;Database=restaurantedb;User Id=sa;Password=Teste123!;TrustServerCertificate=True;
+      - RabbitMQHost=rabbitmq-service
+      - RabbitMQPort=5672
+    ports:
+      - "8081:80"
+    depends_on:
+      - sql1
+      - rabbitmq-service
+    networks:
+      - restaurante-network
+    restart: on-failure
+
+  itemservice:
+    build:
+      context: ./ItemService
+      dockerfile: Dockerfile
+    container_name: itemservice
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_HTTP_PORTS=80
+      - ASPNETCORE_URLS=http://+:80
+      - RabbitMQHost=rabbitmq-service
+      - RabbitMQPort=5672
+    ports:
+      - "8080:80"
+    depends_on:
+      - rabbitmq-service
+    networks:
+      - restaurante-network
+    restart: on-failure
+
+networks:
+  restaurante-network:
+    driver: bridge
