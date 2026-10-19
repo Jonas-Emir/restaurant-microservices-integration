@@ -2,12 +2,15 @@
 
 Integracao assincrona orientada a eventos entre microsservicos utilizando .NET 8, RabbitMQ, SQL Server e Docker Compose.
 
-```mermaid
-flowchart LR
-    A["RestauranteService<br/>(Produtor)"] -->|"Persiste dados"| DB1[("SQL Server")]
-    A -->|"Publica evento"| B["RabbitMQ<br/>Exchange: trigger"]
-    B -->|"Broadcast"| C["ItemService<br/>(Consumidor)"]
-    C -->|"Replica local"| DB2[("Banco em Memoria")]
+```text
++--------------------+     Publica evento     +--------------------+     Broadcast     +--------------------+
+| RestauranteService | ---------------------> |      RabbitMQ      | ----------------> |    ItemService     |
+|     (Produtor)     |                        | (Exchange trigger) |                   |    (Consumidor)    |
++--------------------+                        +--------------------+                   +--------------------+
+          |                                                                                       |
+          | Persiste dados                                                        Replica local   |
+          v                                                                                       v
+  [ SQL Server ]                                                                         [ Banco em Memoria ]
 ```
 
 ### Resumo Tecnico
@@ -69,28 +72,61 @@ Em vez de fazer o ItemService consultar o RestauranteService a cada requisição
 
 O fluxo de comunicação e separação entre contextos segue a estrutura abaixo:
 
-```mermaid
-flowchart TD
-    Client["Cliente<br/>(HTTP / Swagger)"] -->|"POST /api/Restaurante"| RS["RestauranteService"]
-
-    subgraph S1 ["Contexto: Restaurante"]
-        RS -->|"Grava dados"| SQL[("SQL Server<br/>(restaurantedb)")]
-        RS -->|"Publica evento JSON"| RMQ_PUB["RabbitMqClient"]
-    end
-
-    subgraph S2 ["RabbitMQ Broker"]
-        RMQ_PUB -->|"BasicPublish"| EX["Exchange: trigger<br/>(Fanout)"]
-        EX -->|"Distribui"| Q1["Fila ItemService"]
-    end
-
-    subgraph S3 ["Contexto: Itens e Cardapio"]
-        Q1 -->|"Consome mensagem"| SUB["RabbitMqSubscriber<br/>(BackgroundService)"]
-        SUB -->|"Repassa payload"| PROC["ProcessaEvento"]
-        PROC -->|"Persiste replica"| MEM[("EF Core<br/>In-Memory")]
-        Client -->|"GET /api/item/restaurante"| IS["ItemService"]
-        IS -->|"Consulta replica local"| MEM
-        Client -->|"POST /api/item/restaurante/:id/item"| IS
-    end
+```text
+[ Cliente (HTTP / Swagger) ]
+     |
+     | 1. POST /api/Restaurante
+     v
++------------------------------------------------------------------+
+| CONTEXTO: RESTAURANTE                                            |
+|                                                                  |
+|  +--------------------+   Grava dados   +---------------------+  |
+|  | RestauranteService | --------------> |     SQL Server      |  |
+|  +--------------------+                 |   (restaurantedb)   |  |
+|            |                            +---------------------+  |
+|            | Publica evento JSON                                 |
+|            v                                                     |
+|  +--------------------+                                          |
+|  |   RabbitMqClient   |                                          |
+|  +--------------------+                                          |
++------------|-----------------------------------------------------+
+             |
+             | BasicPublish
+             v
++------------------------------------------------------------------+
+| BROKER: RABBITMQ                                                 |
+|                                                                  |
+|  Exchange: trigger (Fanout)                                      |
+|            |                                                     |
+|            | Distribui mensagem                                  |
+|            v                                                     |
+|  Fila exclusiva do ItemService                                   |
++------------|-----------------------------------------------------+
+             |
+             | Consome mensagem
+             v
++------------------------------------------------------------------+
+| CONTEXTO: ITENS E CARDAPIO                                       |
+|                                                                  |
+|  +--------------------+                                          |
+|  | RabbitMqSubscriber | (BackgroundService)                      |
+|  +--------------------+                                          |
+|            |                                                     |
+|            | Repassa payload                                     |
+|            v                                                     |
+|  +--------------------+   Persiste replica   +----------------+  |
+|  |   ProcessaEvento   | -------------------> |    EF Core     |  |
+|  +--------------------+                      |   In-Memory    |  |
+|                                              +-------^--------+  |
+|  +--------------------+                              |           |
+|  |    ItemService     | --- Consulta replica --------+           |
+|  +--------------------+                                          |
++------------^-----------------------------------------------------+
+             |
+             | 2. GET /api/item/restaurante (Leitura autonoma)
+             | 3. POST /api/item/restaurante/:id/item
+             |
+[ Cliente (HTTP / Swagger) ]
 ```
 
 ---
