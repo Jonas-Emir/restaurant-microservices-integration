@@ -1,20 +1,35 @@
-using System.ComponentModel.DataAnnotations;
-
 namespace RestauranteService.Models;
 
 public class Restaurante
 {
-    [Key]
-    [Required]
-    public int Id { get; set; }
+    public int Id { get; private set; }
+    public string Nome { get; private set; } = string.Empty;
+    public string Endereco { get; private set; } = string.Empty;
+    public string Site { get; private set; } = string.Empty;
 
-    [Required]
-    public string Nome { get; set; }
+    // Construtor sem parâmetros para uso exclusivo do EF Core
+    protected Restaurante() { }
 
-    [Required]
-    public string Endereco { get; set; }
+    public Restaurante(string nome, string endereco, string site, int id = 0)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(nome);
+        ArgumentException.ThrowIfNullOrWhiteSpace(endereco);
+        ArgumentException.ThrowIfNullOrWhiteSpace(site);
 
-    [Required]
-    public string Site { get; set; }
+        Id = id;
+        Nome = nome;
+        Endereco = endereco;
+        Site = site;
+    }
 
+    public void AtualizarDados(string nome, string endereco, string site)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(nome);
+        ArgumentException.ThrowIfNullOrWhiteSpace(endereco);
+        ArgumentException.ThrowIfNullOrWhiteSpace(site);
+
+        Nome = nome;
+        Endereco = endereco;
+        Site = site;
+    }
 }
