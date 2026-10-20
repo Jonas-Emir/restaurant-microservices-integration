@@ -2,14 +2,13 @@ using AutoMapper;
 using RestauranteService.Dtos;
 using RestauranteService.Models;
 
-namespace RestauranteService.Profiles
+namespace RestauranteService.Profiles;
+
+public class RestauranteProfile : Profile
 {
-    public class RestauranteProfile : Profile
+    public RestauranteProfile()
     {
-        public RestauranteProfile()
-        {
-            CreateMap<Restaurante, RestauranteReadDto>();
-            CreateMap<RestauranteCreateDto, Restaurante>();
-        }
+        CreateMap<Restaurante, RestauranteReadDto>();
+        CreateMap<RestauranteCreateDto, Restaurante>();
     }
 }
