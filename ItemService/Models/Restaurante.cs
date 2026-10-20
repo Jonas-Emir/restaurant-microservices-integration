@@ -1,26 +1,33 @@
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
+namespace ItemService.Models;
 
-namespace ItemService.Models
+public class Restaurante
 {
-    public class Restaurante
+    public int Id { get; private set; }
+    public int IdExterno { get; private set; }
+    public string Nome { get; private set; } = string.Empty;
+    public string Endereco { get; private set; } = string.Empty;
+    public string Site { get; private set; } = string.Empty;
+    public ICollection<Item> Itens { get; private set; } = [];
+
+    // Construtor sem parâmetros para uso exclusivo do EF Core
+    protected Restaurante() { }
+
+    public Restaurante(int idExterno, string nome, string endereco, string site, int id = 0)
     {
-        [Key]
-        [Required]
-        public int Id { get; set; }
+        ArgumentException.ThrowIfNullOrWhiteSpace(nome);
+        ArgumentException.ThrowIfNullOrWhiteSpace(endereco);
+        ArgumentException.ThrowIfNullOrWhiteSpace(site);
 
-        [Required]
-        public int IdExterno { get; set; }
+        Id = id;
+        IdExterno = idExterno;
+        Nome = nome;
+        Endereco = endereco;
+        Site = site;
+    }
 
-        [Required]
-        public string Nome { get; set; }
-
-        [Required]
-        public string Endereco { get; set; }
-
-        [Required]
-        public string Site { get; set; }
-
-        public ICollection<Item> Itens { get; set; } = new List<Item>();
+    public void AdicionarItem(Item item)
+    {
+        ArgumentNullException.ThrowIfNull(item);
+        Itens.Add(item);
     }
 }
