@@ -1,37 +1,64 @@
+using System.Text.Json;
 using AutoMapper;
 using ItemService.Data;
 using ItemService.Dtos;
 using ItemService.Models;
-using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
-namespace ItemService.EventProcessor
+namespace ItemService.EventProcessor;
+
+public class ProcessaEvento : IProcessaEvento
 {
-    public class ProcessaEvento : IProcessaEvento
+    private readonly IMapper _mapper;
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<ProcessaEvento> _logger;
+
+    public ProcessaEvento(
+        IMapper mapper,
+        IServiceScopeFactory scopeFactory,
+        ILogger<ProcessaEvento> logger)
     {
-        private readonly IMapper _mapper;
-        private readonly IServiceScopeFactory _scopeFactory;
+        _mapper = mapper;
+        _scopeFactory = scopeFactory;
+        _logger = logger;
+    }
 
-        public ProcessaEvento(IMapper mapper, IServiceScopeFactory scopeFactory)
+    public async Task ProcessaAsync(string mensagem, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(mensagem);
+
+        var restauranteReadDto = JsonSerializer.Deserialize<RestauranteReadDto>(
+            mensagem,
+            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+        if (restauranteReadDto is null)
         {
-            _mapper = mapper;
-            _scopeFactory = scopeFactory;
+            _logger.LogWarning("Mensagem recebida do RabbitMQ é inválida ou não pôde ser desserializada.");
+            return;
         }
 
-        public void Processa(string mensagem)
+        using var scope = _scopeFactory.CreateScope();
+        var itemRepository = scope.ServiceProvider.GetRequiredService<IItemRepository>();
+
+        var restaurante = _mapper.Map<Restaurante>(restauranteReadDto);
+
+        var existe = await itemRepository.ExisteRestauranteExternoAsync(restaurante.IdExterno, cancellationToken);
+        if (!existe)
         {
-            using var scope = _scopeFactory.CreateScope();
-
-            var itemRepository = scope.ServiceProvider.GetRequiredService<IItemRepository>();
-
-            var restauranteReadDto = JsonSerializer.Deserialize<RestauranteReadDto>(mensagem);
-
-            var restaurante = _mapper.Map<Restaurante>(restauranteReadDto);
-
-            if (!itemRepository.ExisteRestauranteExternoAsync(restaurante.IdExterno).GetAwaiter().GetResult())
-            {
-                itemRepository.CreateRestauranteAsync(restaurante).GetAwaiter().GetResult();
-                itemRepository.SaveChangesAsync().GetAwaiter().GetResult();
-            }
+            await itemRepository.CreateRestauranteAsync(restaurante, cancellationToken);
+            await itemRepository.SaveChangesAsync(cancellationToken);
+            _logger.LogInformation("Restaurante externo com IdExterno {IdExterno} ('{Nome}') cadastrado com sucesso.", restaurante.IdExterno, restaurante.Nome);
         }
+        else
+        {
+            _logger.LogInformation("Restaurante externo com IdExterno {IdExterno} já existe. Evento ignorado por idempotência.", restaurante.IdExterno);
+        }
+    }
+
+    [Obsolete("Utilize ProcessaAsync para evitar sync-over-async")]
+    public void Processa(string mensagem)
+    {
+        ProcessaAsync(mensagem).GetAwaiter().GetResult();
     }
 }
