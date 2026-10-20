@@ -1,13 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace ItemService.Dtos
-{
-    public class ItemCreateDto
-    {
-        [Required]
-        public string Nome { get; set; }
+namespace ItemService.Dtos;
 
-        [Required]
-        public double Preco { get; set; }
-    }
-}
+public record ItemCreateDto(
+    [Required] string Nome,
+    [Required] decimal Preco);
