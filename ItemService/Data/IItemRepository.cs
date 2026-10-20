@@ -1,18 +1,17 @@
-using System.Collections.Generic;
 using ItemService.Models;
 
 namespace ItemService.Data;
 
 public interface IItemRepository
 {
-    void SaveChanges();
+    Task<bool> SaveChangesAsync(CancellationToken cancellationToken = default);
 
-    IEnumerable<Restaurante> GetAllRestaurantes();
-    void CreateRestaurante(Restaurante restaurante);
-    bool RestauranteExiste(int restauranteId);
-    bool ExisteRestauranteExterno(int restauranteIdExterno);
+    Task<IEnumerable<Restaurante>> GetAllRestaurantesAsync(CancellationToken cancellationToken = default);
+    Task CreateRestauranteAsync(Restaurante restaurante, CancellationToken cancellationToken = default);
+    Task<bool> RestauranteExisteAsync(int restauranteId, CancellationToken cancellationToken = default);
+    Task<bool> ExisteRestauranteExternoAsync(int restauranteIdExterno, CancellationToken cancellationToken = default);
 
-    IEnumerable<Item> GetItensDeRestaurante(int restauranteId);
-    Item GetItem(int restauranteId, int itemId);
-    void CreateItem(int restauranteId, Item item);
+    Task<IEnumerable<Item>> GetItensDeRestauranteAsync(int restauranteId, CancellationToken cancellationToken = default);
+    Task<Item?> GetItemAsync(int restauranteId, int itemId, CancellationToken cancellationToken = default);
+    Task CreateItemAsync(int restauranteId, Item item, CancellationToken cancellationToken = default);
 }

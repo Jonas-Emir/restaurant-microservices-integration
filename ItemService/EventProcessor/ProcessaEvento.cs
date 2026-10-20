@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using ItemService.Data;
 using ItemService.Dtos;
 using ItemService.Models;
@@ -27,10 +27,10 @@ namespace ItemService.EventProcessor
 
             var restaurante = _mapper.Map<Restaurante>(restauranteReadDto);
 
-            if (!itemRepository.ExisteRestauranteExterno(restaurante.Id))
+            if (!itemRepository.ExisteRestauranteExternoAsync(restaurante.IdExterno).GetAwaiter().GetResult())
             {
-                itemRepository.CreateRestaurante(restaurante);
-                itemRepository.SaveChanges();
+                itemRepository.CreateRestauranteAsync(restaurante).GetAwaiter().GetResult();
+                itemRepository.SaveChangesAsync().GetAwaiter().GetResult();
             }
         }
     }

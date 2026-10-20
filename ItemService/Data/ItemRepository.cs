@@ -1,57 +1,59 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using ItemService.Models;
+using Microsoft.EntityFrameworkCore;
 
-namespace ItemService.Data
+namespace ItemService.Data;
+
+public class ItemRepository(AppDbContext context) : IItemRepository
 {
-    public class ItemRepository : IItemRepository
+    public async Task CreateItemAsync(int restauranteId, Item item, CancellationToken cancellationToken = default)
     {
-        private readonly AppDbContext _context;
+        ArgumentNullException.ThrowIfNull(item);
+        item.AssociarAoRestaurante(restauranteId);
+        await context.Itens.AddAsync(item, cancellationToken);
+    }
 
-        public ItemRepository(AppDbContext context)
-        {
-            _context = context;
-        }
+    public async Task CreateRestauranteAsync(Restaurante restaurante, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(restaurante);
+        await context.Restaurantes.AddAsync(restaurante, cancellationToken);
+    }
 
-        public void CreateItem(int restauranteId, Item item)
-        {
-            item.IdRestaurante = restauranteId;
-            _context.Itens.Add(item);
-        }
+    public async Task<bool> ExisteRestauranteExternoAsync(int restauranteIdExterno, CancellationToken cancellationToken = default)
+    {
+        return await context.Restaurantes
+            .AnyAsync(r => r.IdExterno == restauranteIdExterno, cancellationToken);
+    }
 
-        public void CreateRestaurante(Restaurante restaurante)
-        {
-            _context.Restaurantes.Add(restaurante);
-        }
+    public async Task<IEnumerable<Restaurante>> GetAllRestaurantesAsync(CancellationToken cancellationToken = default)
+    {
+        return await context.Restaurantes
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+    }
 
-        public bool ExisteRestauranteExterno(int idExternoRestaurante)
-        {
-            return _context.Restaurantes.Any(restaurante => restaurante.IdExterno == idExternoRestaurante);
-        }
+    public async Task<Item?> GetItemAsync(int restauranteId, int itemId, CancellationToken cancellationToken = default)
+    {
+        return await context.Itens
+            .AsNoTracking()
+            .FirstOrDefaultAsync(i => i.IdRestaurante == restauranteId && i.Id == itemId, cancellationToken);
+    }
 
-        public IEnumerable<Restaurante> GetAllRestaurantes()
-        {
-            return _context.Restaurantes.ToList();
-        }
+    public async Task<IEnumerable<Item>> GetItensDeRestauranteAsync(int restauranteId, CancellationToken cancellationToken = default)
+    {
+        return await context.Itens
+            .AsNoTracking()
+            .Where(i => i.IdRestaurante == restauranteId)
+            .ToListAsync(cancellationToken);
+    }
 
-        public Item GetItem(int restauranteId, int itemId) => _context.Itens
-            .Where(item => item.IdRestaurante == restauranteId && item.Id == itemId).FirstOrDefault();
+    public async Task<bool> RestauranteExisteAsync(int restauranteId, CancellationToken cancellationToken = default)
+    {
+        return await context.Restaurantes
+            .AnyAsync(r => r.Id == restauranteId, cancellationToken);
+    }
 
-        public IEnumerable<Item> GetItensDeRestaurante(int restauranteId)
-        {
-            return _context.Itens
-                .Where(item => item.IdRestaurante == restauranteId);
-        }
-
-        public bool RestauranteExiste(int restauranteId)
-        {
-            return _context.Restaurantes.Any(restaurante => restaurante.Id == restauranteId);
-        }
-
-        public void SaveChanges()
-        {
-            _context.SaveChanges();
-        }
+    public async Task<bool> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        return await context.SaveChangesAsync(cancellationToken) >= 0;
     }
 }
