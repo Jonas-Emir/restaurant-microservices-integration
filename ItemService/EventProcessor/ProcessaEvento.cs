@@ -55,10 +55,4 @@ public class ProcessaEvento : IProcessaEvento
             _logger.LogInformation("Restaurante externo com IdExterno {IdExterno} já existe. Evento ignorado por idempotência.", restaurante.IdExterno);
         }
     }
-
-    [Obsolete("Utilize ProcessaAsync para evitar sync-over-async")]
-    public void Processa(string mensagem)
-    {
-        ProcessaAsync(mensagem).GetAwaiter().GetResult();
-    }
 }
