@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using RestauranteService.Dtos;
 using RestauranteService.Models;
 
 namespace RestauranteService.Data;
@@ -16,6 +17,22 @@ public class RestauranteRepository(AppDbContext context) : IRestauranteRepositor
         return await context.Restaurantes
             .AsNoTracking()
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<PagedResult<Restaurante>> GetRestaurantesPaginadosAsync(PaginationParams paginationParams, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(paginationParams);
+
+        var query = context.Restaurantes.AsNoTracking();
+        var totalItems = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderBy(r => r.Id)
+            .Skip((paginationParams.PageNumber - 1) * paginationParams.PageSize)
+            .Take(paginationParams.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<Restaurante>(items, paginationParams.PageNumber, paginationParams.PageSize, totalItems);
     }
 
     public async Task<Restaurante?> GetRestauranteByIdAsync(int id, CancellationToken cancellationToken = default)

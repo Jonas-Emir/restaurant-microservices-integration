@@ -1,3 +1,4 @@
+using ItemService.Dtos;
 using ItemService.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -31,6 +32,22 @@ public class ItemRepository(AppDbContext context) : IItemRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<PagedResult<Restaurante>> GetRestaurantesPaginadosAsync(PaginationParams paginationParams, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(paginationParams);
+
+        var query = context.Restaurantes.AsNoTracking();
+        var totalItems = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderBy(r => r.Id)
+            .Skip((paginationParams.PageNumber - 1) * paginationParams.PageSize)
+            .Take(paginationParams.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<Restaurante>(items, paginationParams.PageNumber, paginationParams.PageSize, totalItems);
+    }
+
     public async Task<Item?> GetItemAsync(int restauranteId, int itemId, CancellationToken cancellationToken = default)
     {
         return await context.Itens
@@ -44,6 +61,25 @@ public class ItemRepository(AppDbContext context) : IItemRepository
             .AsNoTracking()
             .Where(i => i.IdRestaurante == restauranteId)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<PagedResult<Item>> GetItensDeRestaurantePaginadosAsync(int restauranteId, PaginationParams paginationParams, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(paginationParams);
+
+        var query = context.Itens
+            .AsNoTracking()
+            .Where(i => i.IdRestaurante == restauranteId);
+
+        var totalItems = await query.CountAsync(cancellationToken);
+
+        var items = await query
+            .OrderBy(i => i.Id)
+            .Skip((paginationParams.PageNumber - 1) * paginationParams.PageSize)
+            .Take(paginationParams.PageSize)
+            .ToListAsync(cancellationToken);
+
+        return new PagedResult<Item>(items, paginationParams.PageNumber, paginationParams.PageSize, totalItems);
     }
 
     public async Task<bool> RestauranteExisteAsync(int restauranteId, CancellationToken cancellationToken = default)
