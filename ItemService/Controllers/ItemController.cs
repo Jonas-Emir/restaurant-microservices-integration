@@ -21,16 +21,24 @@ public class ItemController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<ItemReadDto>>> GetItensForRestaurante(int restauranteId, CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<ItemReadDto>>> GetItensForRestaurante(
+        int restauranteId,
+        [FromQuery] PaginationParams paginationParams,
+        CancellationToken cancellationToken)
     {
         if (!await _repository.RestauranteExisteAsync(restauranteId, cancellationToken))
         {
             throw new NotFoundException($"Restaurante com Id {restauranteId} não foi encontrado.");
         }
 
-        var itens = await _repository.GetItensDeRestauranteAsync(restauranteId, cancellationToken);
+        var pagedItens = await _repository.GetItensDeRestaurantePaginadosAsync(restauranteId, paginationParams, cancellationToken);
+        var dtos = _mapper.Map<IReadOnlyList<ItemReadDto>>(pagedItens.Items);
 
-        return Ok(_mapper.Map<IEnumerable<ItemReadDto>>(itens));
+        return Ok(new PagedResult<ItemReadDto>(
+            dtos,
+            pagedItens.PageNumber,
+            pagedItens.PageSize,
+            pagedItens.TotalItems));
     }
 
     [HttpGet("{ItemId}", Name = "GetItemForRestaurante")]

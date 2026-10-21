@@ -31,11 +31,18 @@ public class RestauranteController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<RestauranteReadDto>>> GetAllRestaurantes(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<RestauranteReadDto>>> GetAllRestaurantes(
+        [FromQuery] PaginationParams paginationParams,
+        CancellationToken cancellationToken)
     {
-        var restaurantes = await _repository.GetAllRestaurantesAsync(cancellationToken);
+        var pagedRestaurantes = await _repository.GetRestaurantesPaginadosAsync(paginationParams, cancellationToken);
+        var dtos = _mapper.Map<IReadOnlyList<RestauranteReadDto>>(pagedRestaurantes.Items);
 
-        return Ok(_mapper.Map<IEnumerable<RestauranteReadDto>>(restaurantes));
+        return Ok(new PagedResult<RestauranteReadDto>(
+            dtos,
+            pagedRestaurantes.PageNumber,
+            pagedRestaurantes.PageSize,
+            pagedRestaurantes.TotalItems));
     }
 
     [HttpGet("{id}", Name = "GetRestauranteById")]
