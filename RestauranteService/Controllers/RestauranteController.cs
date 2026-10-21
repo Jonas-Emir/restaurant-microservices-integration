@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using RestauranteService.Data;
 using RestauranteService.Dtos;
 using RestauranteService.Exceptions;
+using RestauranteService.Extensions;
 using RestauranteService.ItemServiceHttpClient;
 using RestauranteService.Models;
 using RestauranteService.RabbitMqClient;
@@ -36,13 +37,9 @@ public class RestauranteController : ControllerBase
         CancellationToken cancellationToken)
     {
         var pagedRestaurantes = await _repository.GetRestaurantesPaginadosAsync(paginationParams, cancellationToken);
-        var dtos = _mapper.Map<IReadOnlyList<RestauranteReadDto>>(pagedRestaurantes.Items);
+        Response.AddPaginationHeader(pagedRestaurantes);
 
-        return Ok(new PagedResult<RestauranteReadDto>(
-            dtos,
-            pagedRestaurantes.PageNumber,
-            pagedRestaurantes.PageSize,
-            pagedRestaurantes.TotalItems));
+        return Ok(pagedRestaurantes.Map(r => _mapper.Map<RestauranteReadDto>(r)));
     }
 
     [HttpGet("{id}", Name = "GetRestauranteById")]

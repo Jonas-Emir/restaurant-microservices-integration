@@ -39,6 +39,11 @@ public class ItemRepository(AppDbContext context) : IItemRepository
         var query = context.Restaurantes.AsNoTracking();
         var totalItems = await query.CountAsync(cancellationToken);
 
+        if (totalItems == 0)
+        {
+            return new PagedResult<Restaurante>([], paginationParams.PageNumber, paginationParams.PageSize, 0);
+        }
+
         var items = await query
             .OrderBy(r => r.Id)
             .Skip((paginationParams.PageNumber - 1) * paginationParams.PageSize)
@@ -72,6 +77,11 @@ public class ItemRepository(AppDbContext context) : IItemRepository
             .Where(i => i.IdRestaurante == restauranteId);
 
         var totalItems = await query.CountAsync(cancellationToken);
+
+        if (totalItems == 0)
+        {
+            return new PagedResult<Item>([], paginationParams.PageNumber, paginationParams.PageSize, 0);
+        }
 
         var items = await query
             .OrderBy(i => i.Id)

@@ -1,7 +1,8 @@
 using AutoMapper;
-using Microsoft.AspNetCore.Mvc;
 using ItemService.Data;
 using ItemService.Dtos;
+using ItemService.Extensions;
+using Microsoft.AspNetCore.Mvc;
 
 namespace ItemService.Controllers;
 
@@ -24,13 +25,9 @@ public class RestauranteController : ControllerBase
         CancellationToken cancellationToken)
     {
         var pagedRestaurantes = await _repository.GetRestaurantesPaginadosAsync(paginationParams, cancellationToken);
-        var dtos = _mapper.Map<IReadOnlyList<RestauranteReadDto>>(pagedRestaurantes.Items);
+        Response.AddPaginationHeader(pagedRestaurantes);
 
-        return Ok(new PagedResult<RestauranteReadDto>(
-            dtos,
-            pagedRestaurantes.PageNumber,
-            pagedRestaurantes.PageSize,
-            pagedRestaurantes.TotalItems));
+        return Ok(pagedRestaurantes.Map(r => _mapper.Map<RestauranteReadDto>(r)));
     }
 
     [HttpPost]

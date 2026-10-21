@@ -2,6 +2,7 @@ using AutoMapper;
 using ItemService.Data;
 using ItemService.Dtos;
 using ItemService.Exceptions;
+using ItemService.Extensions;
 using ItemService.Models;
 using Microsoft.AspNetCore.Mvc;
 
@@ -32,13 +33,9 @@ public class ItemController : ControllerBase
         }
 
         var pagedItens = await _repository.GetItensDeRestaurantePaginadosAsync(restauranteId, paginationParams, cancellationToken);
-        var dtos = _mapper.Map<IReadOnlyList<ItemReadDto>>(pagedItens.Items);
+        Response.AddPaginationHeader(pagedItens);
 
-        return Ok(new PagedResult<ItemReadDto>(
-            dtos,
-            pagedItens.PageNumber,
-            pagedItens.PageSize,
-            pagedItens.TotalItems));
+        return Ok(pagedItens.Map(i => _mapper.Map<ItemReadDto>(i)));
     }
 
     [HttpGet("{ItemId}", Name = "GetItemForRestaurante")]
