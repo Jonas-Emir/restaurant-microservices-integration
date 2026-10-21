@@ -23,7 +23,12 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 
+builder.Services.AddExceptionHandler<ItemService.Middlewares.GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 app.UseSwagger();
 app.UseSwaggerUI();

@@ -1,8 +1,9 @@
 using AutoMapper;
-using Microsoft.AspNetCore.Mvc;
-using ItemService.Dtos;
 using ItemService.Data;
+using ItemService.Dtos;
+using ItemService.Exceptions;
 using ItemService.Models;
+using Microsoft.AspNetCore.Mvc;
 
 namespace ItemService.Controllers;
 
@@ -24,7 +25,7 @@ public class ItemController : ControllerBase
     {
         if (!await _repository.RestauranteExisteAsync(restauranteId, cancellationToken))
         {
-            return NotFound();
+            throw new NotFoundException($"Restaurante com Id {restauranteId} não foi encontrado.");
         }
 
         var itens = await _repository.GetItensDeRestauranteAsync(restauranteId, cancellationToken);
@@ -37,14 +38,14 @@ public class ItemController : ControllerBase
     {
         if (!await _repository.RestauranteExisteAsync(restauranteId, cancellationToken))
         {
-            return NotFound();
+            throw new NotFoundException($"Restaurante com Id {restauranteId} não foi encontrado.");
         }
 
         var item = await _repository.GetItemAsync(restauranteId, itemId, cancellationToken);
 
-        if (item == null)
+        if (item is null)
         {
-            return NotFound();
+            throw new NotFoundException($"Item com Id {itemId} não foi encontrado para o restaurante {restauranteId}.");
         }
 
         return Ok(_mapper.Map<ItemReadDto>(item));
@@ -55,7 +56,7 @@ public class ItemController : ControllerBase
     {
         if (!await _repository.RestauranteExisteAsync(restauranteId, cancellationToken))
         {
-            return NotFound();
+            throw new NotFoundException($"Restaurante com Id {restauranteId} não foi encontrado.");
         }
 
         var item = _mapper.Map<Item>(itemDto);
