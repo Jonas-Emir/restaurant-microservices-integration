@@ -1,31 +1,17 @@
+using System.Reflection;
 using ItemService.Models;
 using Microsoft.EntityFrameworkCore;
 
-namespace ItemService.Data
+namespace ItemService.Data;
+
+public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
-    public class AppDbContext : DbContext
+    public DbSet<Restaurante> Restaurantes => Set<Restaurante>();
+    public DbSet<Item> Itens => Set<Item>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        public AppDbContext(DbContextOptions<AppDbContext> opt) : base(opt)
-        {
-
-        }
-
-        public DbSet<Restaurante> Restaurantes { get; set; }
-        public DbSet<Item> Itens { get; set; }
-
-        protected override void OnModelCreating(ModelBuilder modelBuilder)
-        {
-            modelBuilder
-                .Entity<Restaurante>()
-                .HasMany(c => c.Itens)
-                .WithOne(a => a.Restaurante!)
-                .HasForeignKey(a => a.IdRestaurante);
-
-            modelBuilder
-                .Entity<Item>()
-                .HasOne(a => a.Restaurante)
-                .WithMany(c => c.Itens)
-                .HasForeignKey(a => a.IdRestaurante);
-        }
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
     }
 }

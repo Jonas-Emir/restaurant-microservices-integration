@@ -19,9 +19,9 @@ public class RestauranteController : ControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IEnumerable<RestauranteReadDto>> GetRestaurantes()
+    public async Task<ActionResult<IEnumerable<RestauranteReadDto>>> GetRestaurantes(CancellationToken cancellationToken)
     {
-        var restaurantes = _repository.GetAllRestaurantes();
+        var restaurantes = await _repository.GetAllRestaurantesAsync(cancellationToken);
 
         return Ok(_mapper.Map<IEnumerable<RestauranteReadDto>>(restaurantes));
     }

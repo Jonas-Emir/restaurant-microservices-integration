@@ -1,14 +1,16 @@
+using System.Reflection;
 using Microsoft.EntityFrameworkCore;
 using RestauranteService.Models;
 
 namespace RestauranteService.Data;
 
-public class AppDbContext : DbContext
+public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
-    public AppDbContext(DbContextOptions<AppDbContext> opt) : base(opt)
+    public DbSet<Restaurante> Restaurantes => Set<Restaurante>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.ApplyConfigurationsFromAssembly(Assembly.GetExecutingAssembly());
     }
-
-    public DbSet<Restaurante> Restaurantes { get; set; }
 }

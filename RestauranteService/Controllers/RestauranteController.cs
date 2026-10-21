@@ -28,18 +28,17 @@ public class RestauranteController : ControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IEnumerable<RestauranteReadDto>> GetAllRestaurantes()
+    public async Task<ActionResult<IEnumerable<RestauranteReadDto>>> GetAllRestaurantes(CancellationToken cancellationToken)
     {
-
-        var restaurantes = _repository.GetAllRestaurantes();
+        var restaurantes = await _repository.GetAllRestaurantesAsync(cancellationToken);
 
         return Ok(_mapper.Map<IEnumerable<RestauranteReadDto>>(restaurantes));
     }
 
     [HttpGet("{id}", Name = "GetRestauranteById")]
-    public ActionResult<RestauranteReadDto> GetRestauranteById(int id)
+    public async Task<ActionResult<RestauranteReadDto>> GetRestauranteById(int id, CancellationToken cancellationToken)
     {
-        var restaurante = _repository.GetRestauranteById(id);
+        var restaurante = await _repository.GetRestauranteByIdAsync(id, cancellationToken);
         if (restaurante != null)
         {
             return Ok(_mapper.Map<RestauranteReadDto>(restaurante));
@@ -49,11 +48,11 @@ public class RestauranteController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<RestauranteReadDto>> CreateRestaurante(RestauranteCreateDto restauranteCreateDto)
+    public async Task<ActionResult<RestauranteReadDto>> CreateRestaurante(RestauranteCreateDto restauranteCreateDto, CancellationToken cancellationToken)
     {
         var restaurante = _mapper.Map<Restaurante>(restauranteCreateDto);
-        _repository.CreateRestaurante(restaurante);
-        _repository.SaveChanges();
+        await _repository.CreateRestauranteAsync(restaurante, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
 
         var restauranteReadDto = _mapper.Map<RestauranteReadDto>(restaurante);
 

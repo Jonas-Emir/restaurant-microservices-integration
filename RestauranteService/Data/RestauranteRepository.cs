@@ -1,39 +1,32 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using Microsoft.EntityFrameworkCore;
 using RestauranteService.Models;
 
-namespace RestauranteService.Data
+namespace RestauranteService.Data;
+
+public class RestauranteRepository(AppDbContext context) : IRestauranteRepository
 {
-    public class RestauranteRepository : IRestauranteRepository
+    public async Task CreateRestauranteAsync(Restaurante restaurante, CancellationToken cancellationToken = default)
     {
-        private readonly AppDbContext _context;
+        ArgumentNullException.ThrowIfNull(restaurante);
+        await context.Restaurantes.AddAsync(restaurante, cancellationToken);
+    }
 
-        public RestauranteRepository(AppDbContext context)
-        {
-            _context = context;
-        }
+    public async Task<IEnumerable<Restaurante>> GetAllRestaurantesAsync(CancellationToken cancellationToken = default)
+    {
+        return await context.Restaurantes
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+    }
 
-        public void CreateRestaurante(Restaurante restaurante)
-        {
-            if (restaurante == null)
-            {
-                throw new ArgumentNullException(nameof(restaurante));
-            }
+    public async Task<Restaurante?> GetRestauranteByIdAsync(int id, CancellationToken cancellationToken = default)
+    {
+        return await context.Restaurantes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
+    }
 
-            _context.Restaurantes.Add(restaurante);
-        }
-
-        public IEnumerable<Restaurante> GetAllRestaurantes()
-        {
-            return _context.Restaurantes.ToList();
-        }
-
-        public Restaurante GetRestauranteById(int id) => _context.Restaurantes.FirstOrDefault(c => c.Id == id);
-
-        public void SaveChanges()
-        {
-            _context.SaveChanges();
-        }
+    public async Task<bool> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        return await context.SaveChangesAsync(cancellationToken) >= 0;
     }
 }

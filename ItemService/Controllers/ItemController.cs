@@ -20,28 +20,27 @@ public class ItemController : ControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IEnumerable<ItemReadDto>> GetItensForRestaurante(int restauranteId)
+    public async Task<ActionResult<IEnumerable<ItemReadDto>>> GetItensForRestaurante(int restauranteId, CancellationToken cancellationToken)
     {
-
-        if (!_repository.RestauranteExiste(restauranteId))
+        if (!await _repository.RestauranteExisteAsync(restauranteId, cancellationToken))
         {
             return NotFound();
         }
 
-        var itens = _repository.GetItensDeRestaurante(restauranteId);
+        var itens = await _repository.GetItensDeRestauranteAsync(restauranteId, cancellationToken);
 
         return Ok(_mapper.Map<IEnumerable<ItemReadDto>>(itens));
     }
 
     [HttpGet("{ItemId}", Name = "GetItemForRestaurante")]
-    public ActionResult<ItemReadDto> GetItemForRestaurante(int restauranteId, int itemId)
+    public async Task<ActionResult<ItemReadDto>> GetItemForRestaurante(int restauranteId, int itemId, CancellationToken cancellationToken)
     {
-        if (!_repository.RestauranteExiste(restauranteId))
+        if (!await _repository.RestauranteExisteAsync(restauranteId, cancellationToken))
         {
             return NotFound();
         }
 
-        var item = _repository.GetItem(restauranteId, itemId);
+        var item = await _repository.GetItemAsync(restauranteId, itemId, cancellationToken);
 
         if (item == null)
         {
@@ -52,17 +51,17 @@ public class ItemController : ControllerBase
     }
 
     [HttpPost]
-    public ActionResult<ItemReadDto> CreateItemForRestaurante(int restauranteId, ItemCreateDto itemDto)
+    public async Task<ActionResult<ItemReadDto>> CreateItemForRestaurante(int restauranteId, ItemCreateDto itemDto, CancellationToken cancellationToken)
     {
-        if (!_repository.RestauranteExiste(restauranteId))
+        if (!await _repository.RestauranteExisteAsync(restauranteId, cancellationToken))
         {
             return NotFound();
         }
 
         var item = _mapper.Map<Item>(itemDto);
 
-        _repository.CreateItem(restauranteId, item);
-        _repository.SaveChanges();
+        await _repository.CreateItemAsync(restauranteId, item, cancellationToken);
+        await _repository.SaveChangesAsync(cancellationToken);
 
         var itemReadDto = _mapper.Map<ItemReadDto>(item);
 

@@ -4,9 +4,9 @@ namespace RestauranteService.Data;
 
 public interface IRestauranteRepository
 {
-    void SaveChanges();
+    Task<bool> SaveChangesAsync(CancellationToken cancellationToken = default);
 
-    IEnumerable<Restaurante> GetAllRestaurantes();
-    Restaurante GetRestauranteById(int id);
-    void CreateRestaurante(Restaurante restaurante);
+    Task<IEnumerable<Restaurante>> GetAllRestaurantesAsync(CancellationToken cancellationToken = default);
+    Task<Restaurante?> GetRestauranteByIdAsync(int id, CancellationToken cancellationToken = default);
+    Task CreateRestauranteAsync(Restaurante restaurante, CancellationToken cancellationToken = default);
 }
