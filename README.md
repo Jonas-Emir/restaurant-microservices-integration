@@ -2,15 +2,28 @@
 
 Integracao assincrona orientada a eventos entre microsservicos utilizando .NET 8, RabbitMQ, SQL Server e Docker Compose.
 
-```text
-+--------------------+     Publica evento     +--------------------+     Broadcast     +--------------------+
-| RestauranteService | ---------------------> |      RabbitMQ      | ----------------> |    ItemService     |
-|     (Produtor)     |                        | (Exchange trigger) |                   |    (Consumidor)    |
-+--------------------+                        +--------------------+                   +--------------------+
-          |                                                                                       |
-          | Persiste dados                                                        Replica local   |
-          v                                                                                       v
-  [ SQL Server ]                                                                         [ Banco em Memoria ]
+```mermaid
+flowchart LR
+    subgraph Produtor ["Contexto: Restaurante (Produtor)"]
+        direction TB
+        RS["RestauranteService<br>(Produtor)"]
+        SQL[("<br>SQL Server<br>(Base restaurantedb)<br>")]
+        RS -->|"Persiste dados"| SQL
+    end
+
+    subgraph Mensageria ["Broker AMQP"]
+        Broker["RabbitMQ<br>(Exchange Fanout: trigger)"]
+    end
+
+    subgraph Consumidor ["Contexto: Itens e Cardapio (Consumidor)"]
+        direction TB
+        IS["ItemService<br>(Consumidor)"]
+        MEM[("<br>Banco em Memoria<br>(Replica Local)<br>")]
+        IS -->|"Replica local"| MEM
+    end
+
+    Produtor -->|"Publica evento"| Mensageria
+    Mensageria -->|"Broadcast"| Consumidor
 ```
 
 ### Resumo Tecnico
@@ -37,7 +50,7 @@ Integracao assincrona orientada a eventos entre microsservicos utilizando .NET 8
 ## Sumário
 - [1. Visão Geral](#1-visão-geral)
 - [2. Arquitetura e Fluxo de Mensageria](#2-arquitetura-e-fluxo-de-mensageria)
-  - [2.1. Diagrama de Fluxo](#21-diagrama-de-fluxo)
+  - [2.1. Diagrama de Fluxo e Sequência](#21-diagrama-de-fluxo-e-sequência)
   - [2.2. Funcionamento do RabbitMQ](#22-funcionamento-do-rabbitmq)
   - [2.3. Idempotência e Replicação Local](#23-idempotência-e-replicação-local)
 - [3. Microsserviços](#3-microsserviços)
@@ -68,65 +81,92 @@ Em vez de fazer o ItemService consultar o RestauranteService a cada requisição
 
 ## 2. Arquitetura e Fluxo de Mensageria
 
-### 2.1. Diagrama de Fluxo
+### 2.1. Diagrama de Fluxo e Sequência
 
 O fluxo de comunicação e separação entre contextos segue a estrutura abaixo:
 
-```text
-[ Cliente (HTTP / Swagger) ]
-     |
-     | 1. POST /api/Restaurante
-     v
-+------------------------------------------------------------------+
-| CONTEXTO: RESTAURANTE                                            |
-|                                                                  |
-|  +--------------------+   Grava dados   +---------------------+  |
-|  | RestauranteService | --------------> |     SQL Server      |  |
-|  +--------------------+                 |   (restaurantedb)   |  |
-|            |                            +---------------------+  |
-|            | Publica evento JSON                                 |
-|            v                                                     |
-|  +--------------------+                                          |
-|  |   RabbitMqClient   |                                          |
-|  +--------------------+                                          |
-+------------|-----------------------------------------------------+
-             |
-             | BasicPublish
-             v
-+------------------------------------------------------------------+
-| BROKER: RABBITMQ                                                 |
-|                                                                  |
-|  Exchange: trigger (Fanout)                                      |
-|            |                                                     |
-|            | Distribui mensagem                                  |
-|            v                                                     |
-|  Fila exclusiva do ItemService                                   |
-+------------|-----------------------------------------------------+
-             |
-             | Consome mensagem
-             v
-+------------------------------------------------------------------+
-| CONTEXTO: ITENS E CARDAPIO                                       |
-|                                                                  |
-|  +--------------------+                                          |
-|  | RabbitMqSubscriber | (BackgroundService)                      |
-|  +--------------------+                                          |
-|            |                                                     |
-|            | Repassa payload                                     |
-|            v                                                     |
-|  +--------------------+   Persiste replica   +----------------+  |
-|  |   ProcessaEvento   | -------------------> |    EF Core     |  |
-|  +--------------------+                      |   In-Memory    |  |
-|                                              +-------^--------+  |
-|  +--------------------+                              |           |
-|  |    ItemService     | --- Consulta replica --------+           |
-|  +--------------------+                                          |
-+------------^-----------------------------------------------------+
-             |
-             | 2. GET /api/item/restaurante (Leitura autonoma)
-             | 3. POST /api/item/restaurante/:id/item
-             |
-[ Cliente (HTTP / Swagger) ]
+```mermaid
+flowchart LR
+    Client1["Cliente HTTP<br>(Swagger / UI)"] -->|"POST Restaurante"| RS["RestauranteService"]
+
+    subgraph S_Producer ["Contexto: Restaurante"]
+        direction TB
+        RS
+        SQL[("<br>SQL Server<br>(restaurantedb)<br>")]
+        PUB["RabbitMqClient"]
+
+        RS -->|"Persiste dados"| SQL
+        RS -->|"Publica evento"| PUB
+    end
+
+    subgraph S_Broker ["Broker RabbitMQ"]
+        direction TB
+        EX["Exchange: trigger<br>(Fanout)"]
+        QUEUE["Fila exclusiva<br>(ItemService)"]
+        EX -->|"Distribui"| QUEUE
+    end
+
+    subgraph S_Consumer ["Contexto: Itens e Cardapio"]
+        direction TB
+        SUB["RabbitMqSubscriber<br>(BackgroundService)"]
+        PROC["ProcessaEvento<br>(Idempotencia)"]
+        MEM[("<br>EF Core In-Memory<br>(Replica Local)<br>")]
+        IS["ItemService<br>(API Cardapio)"]
+
+        SUB -->|"Repassa"| PROC
+        PROC -->|"Persiste replica"| MEM
+        IS -->|"Consulta replica"| MEM
+    end
+
+    PUB -->|"BasicPublish"| EX
+    QUEUE -->|"Consome"| SUB
+
+    Client2["Cliente HTTP<br>(Swagger / UI)"] -->|"GET / POST Itens"| IS
+```
+
+#### Diagrama de Sequência (Ciclo de Vida do Evento)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Cliente as Cliente HTTP
+    participant RS as RestauranteService
+    participant SQL as SQL Server
+    participant PUB as RabbitMqClient
+    participant RMQ as RabbitMQ (trigger)
+    participant SUB as RabbitMqSubscriber
+    participant PROC as ProcessaEvento
+    participant MEM as EF Core In-Memory
+    participant IS as ItemService
+
+    Note over Cliente,RS: Fluxo 1: Cadastro e Publicacao Assincrona
+    Cliente->>+RS: POST /api/Restaurante
+    RS->>+SQL: Salva Restaurante
+    SQL-->>-RS: Confirmacao de Gravacao
+    RS->>+PUB: Publica dados de integracao
+    PUB->>RMQ: BasicPublish (Fanout: trigger)
+    PUB-->>-RS: Evento despachado
+    RS-->>-Cliente: HTTP 201 Created
+
+    Note over RMQ,MEM: Fluxo 2: Consumo em Segundo Plano e Replicacao
+    RMQ->>+SUB: Entrega mensagem (AMQP)
+    SUB->>+PROC: Repassa payload JSON
+    PROC->>+MEM: Verifica IdExterno (Deduplicacao)
+    alt Registro Inedito
+        PROC->>MEM: Grava replica local
+    else Registro Duplicado
+        PROC->>PROC: Descarta silenciosamente
+    end
+    MEM-->>-PROC: Confirmacao
+    PROC-->>-SUB: Sucesso no processamento
+    SUB->>RMQ: BasicAck (Confirmacao)
+    deactivate SUB
+
+    Note over Cliente,IS: Fluxo 3: Consulta Autonoma e Cardapio
+    Cliente->>+IS: GET /api/item/restaurante
+    IS->>+MEM: Consulta replica local
+    MEM-->>-IS: Retorna lista de restaurantes
+    IS-->>-Cliente: HTTP 200 OK (Sem chamadas HTTP externas)
 ```
 
 ---
