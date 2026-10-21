@@ -1,8 +1,10 @@
 using AutoMapper;
-using Microsoft.AspNetCore.Mvc;
-using ItemService.Dtos;
 using ItemService.Data;
+using ItemService.Dtos;
+using ItemService.Exceptions;
+using ItemService.Extensions;
 using ItemService.Models;
+using Microsoft.AspNetCore.Mvc;
 
 namespace ItemService.Controllers;
 
@@ -20,16 +22,20 @@ public class ItemController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<ItemReadDto>>> GetItensForRestaurante(int restauranteId, CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<ItemReadDto>>> GetItensForRestaurante(
+        int restauranteId,
+        [FromQuery] PaginationParams paginationParams,
+        CancellationToken cancellationToken)
     {
         if (!await _repository.RestauranteExisteAsync(restauranteId, cancellationToken))
         {
-            return NotFound();
+            throw new NotFoundException($"Restaurante com Id {restauranteId} não foi encontrado.");
         }
 
-        var itens = await _repository.GetItensDeRestauranteAsync(restauranteId, cancellationToken);
+        var pagedItens = await _repository.GetItensDeRestaurantePaginadosAsync(restauranteId, paginationParams, cancellationToken);
+        Response.AddPaginationHeader(pagedItens);
 
-        return Ok(_mapper.Map<IEnumerable<ItemReadDto>>(itens));
+        return Ok(pagedItens.Map(i => _mapper.Map<ItemReadDto>(i)));
     }
 
     [HttpGet("{ItemId}", Name = "GetItemForRestaurante")]
@@ -37,14 +43,14 @@ public class ItemController : ControllerBase
     {
         if (!await _repository.RestauranteExisteAsync(restauranteId, cancellationToken))
         {
-            return NotFound();
+            throw new NotFoundException($"Restaurante com Id {restauranteId} não foi encontrado.");
         }
 
         var item = await _repository.GetItemAsync(restauranteId, itemId, cancellationToken);
 
-        if (item == null)
+        if (item is null)
         {
-            return NotFound();
+            throw new NotFoundException($"Item com Id {itemId} não foi encontrado para o restaurante {restauranteId}.");
         }
 
         return Ok(_mapper.Map<ItemReadDto>(item));
@@ -55,7 +61,7 @@ public class ItemController : ControllerBase
     {
         if (!await _repository.RestauranteExisteAsync(restauranteId, cancellationToken))
         {
-            return NotFound();
+            throw new NotFoundException($"Restaurante com Id {restauranteId} não foi encontrado.");
         }
 
         var item = _mapper.Map<Item>(itemDto);

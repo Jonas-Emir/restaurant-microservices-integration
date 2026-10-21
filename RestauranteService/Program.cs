@@ -31,7 +31,12 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 
+builder.Services.AddExceptionHandler<RestauranteService.Middlewares.GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
+
 var app = builder.Build();
+
+app.UseExceptionHandler();
 
 app.UseSwagger();
 app.UseSwaggerUI();

@@ -1,7 +1,7 @@
-﻿namespace ItemService.EventProcessor
+namespace ItemService.EventProcessor;
+
+public interface IProcessaEvento
 {
-    public interface IProcessaEvento
-    {
-        void Processa(string mensagem);
-    }
+    Task ProcessaAsync(string mensagem, CancellationToken cancellationToken = default);
 }
+

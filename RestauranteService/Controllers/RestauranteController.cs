@@ -2,6 +2,8 @@ using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
 using RestauranteService.Data;
 using RestauranteService.Dtos;
+using RestauranteService.Exceptions;
+using RestauranteService.Extensions;
 using RestauranteService.ItemServiceHttpClient;
 using RestauranteService.Models;
 using RestauranteService.RabbitMqClient;
@@ -14,12 +16,14 @@ public class RestauranteController : ControllerBase
 {
     private readonly IRestauranteRepository _repository;
     private readonly IMapper _mapper;
-    private IItemServiceHttpClient _itemServiceHttpClient;
-    private IRabbitMqClient _rabbitMqClient;
+    private readonly IItemServiceHttpClient _itemServiceHttpClient;
+    private readonly IRabbitMqClient _rabbitMqClient;
 
     public RestauranteController(
         IRestauranteRepository repository,
-        IMapper mapper, IItemServiceHttpClient itemServiceHttpClient, IRabbitMqClient rabbitMqClient)
+        IMapper mapper,
+        IItemServiceHttpClient itemServiceHttpClient,
+        IRabbitMqClient rabbitMqClient)
     {
         _repository = repository;
         _mapper = mapper;
@@ -28,23 +32,26 @@ public class RestauranteController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<RestauranteReadDto>>> GetAllRestaurantes(CancellationToken cancellationToken)
+    public async Task<ActionResult<PagedResult<RestauranteReadDto>>> GetAllRestaurantes(
+        [FromQuery] PaginationParams paginationParams,
+        CancellationToken cancellationToken)
     {
-        var restaurantes = await _repository.GetAllRestaurantesAsync(cancellationToken);
+        var pagedRestaurantes = await _repository.GetRestaurantesPaginadosAsync(paginationParams, cancellationToken);
+        Response.AddPaginationHeader(pagedRestaurantes);
 
-        return Ok(_mapper.Map<IEnumerable<RestauranteReadDto>>(restaurantes));
+        return Ok(pagedRestaurantes.Map(r => _mapper.Map<RestauranteReadDto>(r)));
     }
 
     [HttpGet("{id}", Name = "GetRestauranteById")]
     public async Task<ActionResult<RestauranteReadDto>> GetRestauranteById(int id, CancellationToken cancellationToken)
     {
         var restaurante = await _repository.GetRestauranteByIdAsync(id, cancellationToken);
-        if (restaurante != null)
+        if (restaurante is null)
         {
-            return Ok(_mapper.Map<RestauranteReadDto>(restaurante));
+            throw new NotFoundException($"Restaurante com Id {id} não foi encontrado.");
         }
 
-        return NotFound();
+        return Ok(_mapper.Map<RestauranteReadDto>(restaurante));
     }
 
     [HttpPost]
